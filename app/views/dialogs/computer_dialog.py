@@ -1,32 +1,43 @@
 from PyQt6.QtWidgets import (
-    QDialog, QFormLayout, QLineEdit, QSpinBox,
-    QComboBox, QDateEdit, QTextEdit, QDialogButtonBox, QMessageBox
+    QDialog, QFormLayout, QLineEdit, QSpinBox, QComboBox,
+    QDateEdit, QTextEdit, QDialogButtonBox, QMessageBox,
+    QTabWidget, QWidget, QVBoxLayout, QTableView, QHeaderView
 )
 from PyQt6.QtCore import QDate
 from sqlalchemy.exc import IntegrityError
+from app.services.auth import session_manager
+from app.views.models.generic_table_model import GenericTableModel
 
 
 class ComputerDialog(QDialog):
-    def __init__(self, repo, computer_types, workplaces, computer=None, parent=None):
+    # ДОДАНО: status_logs_repo у параметри ініціалізації
+    def __init__(self, repo, computer_types, workplaces, status_logs_repo=None, computer=None, parent=None):
         super().__init__(parent)
         self.repo = repo
         self.computer_types = computer_types
         self.workplaces = workplaces
+        self.status_logs_repo = status_logs_repo
         self.computer = computer
+
         self.setWindowTitle("Редагування комп'ютера" if computer else "Новий комп'ютер")
-        self.setMinimumWidth(450)
-        self._build_form()
+        self.setMinimumWidth(500)
+        self.setMinimumHeight(450)
+        self._build_ui()  # Перейменували _build_form на _build_ui
         if computer:
             self._populate(computer)
+            self._load_logs()  # Завантажуємо історію
 
-    def _build_form(self):
-        layout = QFormLayout(self)
+    def _build_ui(self):
+        main_layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+
+        # --- ВКЛАДКА 1: Основні дані ---
+        self.tab_form = QWidget()
+        layout = QFormLayout(self.tab_form)
 
         self.f_inventory = QLineEdit()
-
         self.f_type = QComboBox()
-        for ct in self.computer_types:
-            self.f_type.addItem(ct.name, ct.id)
+        for ct in self.computer_types: self.f_type.addItem(ct.name, ct.id)
 
         self.f_workplace = QComboBox()
         self.f_workplace.addItem("— На складі (не закріплено) —", None)
@@ -34,8 +45,8 @@ class ComputerDialog(QDialog):
             room_info = f" ({wp.room.name})" if wp.room else ""
             self.f_workplace.addItem(f"{wp.name}{room_info}", wp.id)
 
-        self.f_brand = QLineEdit()
-        self.f_model = QLineEdit()
+        self.f_brand = QLineEdit();
+        self.f_model = QLineEdit();
         self.f_processor = QLineEdit()
         self.f_ram = QSpinBox();
         self.f_ram.setRange(1, 512);
@@ -43,46 +54,66 @@ class ComputerDialog(QDialog):
         self.f_storage = QSpinBox();
         self.f_storage.setRange(1, 10000);
         self.f_storage.setSuffix(" ГБ")
-
-        self.f_storage_type = QComboBox()
+        self.f_storage_type = QComboBox();
         self.f_storage_type.addItems(["SSD", "HDD", "NVMe", "Інше"])
-
         self.f_os = QLineEdit()
         self.f_ip = QLineEdit();
         self.f_ip.setPlaceholderText("192.168.1.1")
         self.f_mac = QLineEdit();
         self.f_mac.setPlaceholderText("AA:BB:CC:DD:EE:FF")
-        self.f_date = QDateEdit(calendarPopup=True)
+        self.f_date = QDateEdit(calendarPopup=True);
         self.f_date.setDate(QDate.currentDate())
 
         self.f_status = QComboBox()
         for val, label in [("active", "Активний"), ("repair", "Ремонт"),
                            ("decommissioned", "Списаний"), ("storage", "На зберіганні")]:
             self.f_status.addItem(label, val)
-
         self.f_notes = QTextEdit();
         self.f_notes.setFixedHeight(60)
 
-        layout.addRow("Інв. номер *", self.f_inventory)
+        layout.addRow("Інв. номер *", self.f_inventory);
         layout.addRow("Тип ПК *", self.f_type)
-        layout.addRow("Робоче місце", self.f_workplace)
+        layout.addRow("Робоче місце", self.f_workplace);
         layout.addRow("Виробник", self.f_brand)
-        layout.addRow("Модель", self.f_model)
+        layout.addRow("Модель", self.f_model);
         layout.addRow("Процесор", self.f_processor)
-        layout.addRow("RAM", self.f_ram)
+        layout.addRow("RAM", self.f_ram);
         layout.addRow("Об'єм диску", self.f_storage)
-        layout.addRow("Тип диску", self.f_storage_type)
+        layout.addRow("Тип диску", self.f_storage_type);
         layout.addRow("ОС", self.f_os)
-        layout.addRow("IP-адреса", self.f_ip)
+        layout.addRow("IP-адреса", self.f_ip);
         layout.addRow("MAC-адреса", self.f_mac)
-        layout.addRow("Дата закупівлі", self.f_date)
+        layout.addRow("Дата закупівлі", self.f_date);
         layout.addRow("Статус", self.f_status)
         layout.addRow("Примітки", self.f_notes)
+
+        self.tabs.addTab(self.tab_form, "Основні дані")
+
+        # --- ВКЛАДКА 2: Історія змін ---
+        self.tab_logs = QWidget()
+        logs_layout = QVBoxLayout(self.tab_logs)
+        cols = [("date_str", "Дата"), ("old_st_str", "Було"), ("new_st_str", "Стало"), ("user_name", "Користувач")]
+        self.logs_model = GenericTableModel(cols)
+        self.logs_table = QTableView()
+        self.logs_table.setModel(self.logs_model)
+        self.logs_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        logs_layout.addWidget(self.logs_table)
+        self.tabs.addTab(self.tab_logs, "Історія змін")
+
+        # Вимикаємо вкладку історії, якщо комп'ютер ще не створено
+        if not self.computer: self.tabs.setTabEnabled(1, False)
+
+        main_layout.addWidget(self.tabs)
 
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(self._save)
         btns.rejected.connect(self.reject)
-        layout.addRow(btns)
+        main_layout.addWidget(btns)
+
+    def _load_logs(self):
+        if self.status_logs_repo and self.computer:
+            logs = self.status_logs_repo.get_by_device("computer", self.computer.id)
+            self.logs_model.refresh(logs)
 
     def _populate(self, c):
         self.f_inventory.setText(c.inventory_number or "")
@@ -139,25 +170,31 @@ class ComputerDialog(QDialog):
         }
 
     def _save(self):
-        """Зберігає або оновлює запис у БД."""
-        if not self._validate():
-            return
+        if not self._validate(): return
 
+        old_status = self.computer.status if self.computer else "—"
         new_status = self.f_status.currentData()
-
-        # STUB: Готуємо виклик STATUS_LOGS, якщо це редагування і статус змінився
-        if self.computer and self.computer.status != new_status:
-            print(
-                f"[STUB] Аудит-журнал: статус ПК {self.f_inventory.text()} змінено з {self.computer.status} на {new_status}.")
-            # TODO: Викликати сервіс або репозиторій логів
-
         data = self._collect()
 
         try:
             if self.computer:
                 self.repo.update(self.computer, **data)
+                comp_id = self.computer.id
             else:
-                self.repo.create(**data)
+                new_comp = self.repo.create(**data)
+                comp_id = new_comp.id
+
+            # ІНТЕГРАЦІЯ АУДИТУ: Пишемо лог, якщо статус змінився
+            if old_status != new_status and self.status_logs_repo:
+                user = session_manager.get_user()
+                self.status_logs_repo.create(
+                    device_type="computer",
+                    device_id=comp_id,
+                    old_status=old_status,
+                    new_status=new_status,
+                    changed_by=user.id if user else 1,
+                    comment="Зміна статусу через картку пристрою."
+                )
             self.accept()
         except IntegrityError as e:
             if "UNIQUE constraint failed" in str(e.orig):
@@ -165,5 +202,3 @@ class ComputerDialog(QDialog):
                 self.f_inventory.setFocus()
             else:
                 QMessageBox.critical(self, "Помилка БД", str(e.orig))
-        except Exception as e:
-            QMessageBox.critical(self, "Помилка", str(e))
