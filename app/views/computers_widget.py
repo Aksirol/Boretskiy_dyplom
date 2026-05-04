@@ -8,6 +8,9 @@ from sqlalchemy.exc import IntegrityError
 from app.views.models.computer_table_model import ComputerTableModel
 from app.views.dialogs.computer_dialog import ComputerDialog
 
+from PyQt6.QtWidgets import QMenu, QFileDialog
+from app.services.exporter import Exporter
+
 
 class ComputersWidget(QWidget):
     def __init__(self, repo, comp_types_repo, rooms_repo, workplaces_repo, parent=None):
@@ -87,6 +90,13 @@ class ComputersWidget(QWidget):
         filters.addWidget(self.btn_reset)
         filters.addStretch()
         root.addLayout(filters)
+
+        self.btn_export = QPushButton("Експорт ▼")
+        export_menu = QMenu(self.btn_export)
+        export_menu.addAction("в Excel (.xlsx)", self._export_excel)
+        export_menu.addAction("в PDF (.pdf)", self._export_pdf)
+        self.btn_export.setMenu(export_menu)
+        filters.addWidget(self.btn_export)
 
         # 3. Таблиця з QSortFilterProxyModel
         self.model = ComputerTableModel()
@@ -169,3 +179,48 @@ class ComputersWidget(QWidget):
                 self.load_data()
             except IntegrityError:
                 QMessageBox.critical(self, "Помилка", "Неможливо видалити: є пов'язані записи.")
+
+        # ─── ЕКСПОРТ ─────────────────────────────────────────────────────────────
+
+        def _prepare_export_data(self):
+            """Готує дані з поточної моделі таблиці для експорту."""
+            headers = [col[1] for col in ComputerTableModel.COLUMNS]
+            data = []
+            # Проходимося по всіх відфільтрованих рядках у ProxyModel
+            for row in range(self.proxy_model.rowCount()):
+                row_data = []
+                for col in range(self.proxy_model.columnCount()):
+                    idx = self.proxy_model.index(row, col)
+                    # Беремо текст, який бачить користувач
+                    val = self.proxy_model.data(idx, Qt.ItemDataRole.DisplayRole)
+                    row_data.append(val)
+                data.append(row_data)
+            return headers, data
+
+        def _export_excel(self):
+            headers, data = self._prepare_export_data()
+            if not data:
+                QMessageBox.warning(self, "Помилка", "Немає даних для експорту!")
+                return
+
+            filepath, _ = QFileDialog.getSaveFileName(self, "Зберегти Excel", "", "Excel Files (*.xlsx)")
+            if filepath:
+                try:
+                    Exporter.to_excel(filepath, headers, data, "Реєстр комп'ютерів")
+                    QMessageBox.information(self, "Успіх", "Файл успішно збережено!")
+                except Exception as e:
+                    QMessageBox.critical(self, "Помилка експорту", str(e))
+
+        def _export_pdf(self):
+            headers, data = self._prepare_export_data()
+            if not data:
+                QMessageBox.warning(self, "Помилка", "Немає даних для експорту!")
+                return
+
+            filepath, _ = QFileDialog.getSaveFileName(self, "Зберегти PDF", "", "PDF Files (*.pdf)")
+            if filepath:
+                try:
+                    Exporter.to_pdf(filepath, headers, data, "Реєстр комп'ютерів")
+                    QMessageBox.information(self, "Успіх", "Файл успішно збережено!")
+                except Exception as e:
+                    QMessageBox.critical(self, "Помилка експорту", str(e))
