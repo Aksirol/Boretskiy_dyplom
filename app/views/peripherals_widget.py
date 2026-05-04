@@ -10,12 +10,13 @@ from app.views.dialogs.peripheral_dialog import PeripheralDialog
 
 
 class PeripheralsWidget(QWidget):
-    def __init__(self, repo, periph_types_repo, rooms_repo, workplaces_repo, parent=None):
+    def __init__(self, repo, periph_types_repo, rooms_repo, workplaces_repo, status_logs_repo, parent=None):
         super().__init__(parent)
         self.repo = repo
         self.periph_types_repo = periph_types_repo
         self.rooms_repo = rooms_repo
         self.workplaces_repo = workplaces_repo
+        self.status_logs_repo = status_logs_repo # Тепер змінна знайдеться!
 
         self._setup_ui()
         self._setup_debounce()
@@ -140,14 +141,16 @@ class PeripheralsWidget(QWidget):
         return self.model.get_object(source_idx.row())
 
     def _add(self):
-        dlg = PeripheralDialog(self.repo, self.periph_types_repo.get_all(), self.workplaces_repo.get_all(), parent=self)
+        dlg = PeripheralDialog(self.repo, self.periph_types_repo.get_all(), self.workplaces_repo.get_all(), self.status_logs_repo, parent=self)
         if dlg.exec(): self.load_data()
 
     def _edit(self):
         obj = self._selected()
-        if not obj: return
+        if not obj:
+            QMessageBox.information(self, "Увага", "Оберіть рядок для редагування")
+            return
         dlg = PeripheralDialog(self.repo, self.periph_types_repo.get_all(), self.workplaces_repo.get_all(),
-                               peripheral=obj, parent=self)
+                               self.status_logs_repo, peripheral=obj, parent=self)
         if dlg.exec(): self.load_data()
 
     def _delete(self):

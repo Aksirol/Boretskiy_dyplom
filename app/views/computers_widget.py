@@ -13,12 +13,13 @@ from app.services.exporter import Exporter
 
 
 class ComputersWidget(QWidget):
-    def __init__(self, repo, comp_types_repo, rooms_repo, workplaces_repo, parent=None):
+    def __init__(self, repo, comp_types_repo, rooms_repo, workplaces_repo, status_logs_repo, parent=None):
         super().__init__(parent)
         self.repo = repo
         self.comp_types_repo = comp_types_repo
         self.rooms_repo = rooms_repo
         self.workplaces_repo = workplaces_repo
+        self.status_logs_repo = status_logs_repo
 
         self._setup_ui()
         self._setup_debounce()
@@ -156,7 +157,8 @@ class ComputersWidget(QWidget):
         return self.model.get_object(source_idx.row())
 
     def _add(self):
-        dlg = ComputerDialog(self.repo, self.comp_types_repo.get_all(), self.workplaces_repo.get_all(), parent=self)
+        # Додаємо self.status_logs_repo перед parent=self
+        dlg = ComputerDialog(self.repo, self.comp_types_repo.get_all(), self.workplaces_repo.get_all(), self.status_logs_repo, parent=self)
         if dlg.exec(): self.load_data()
 
     def _edit(self):
@@ -164,8 +166,8 @@ class ComputersWidget(QWidget):
         if not obj:
             QMessageBox.information(self, "Увага", "Оберіть рядок для редагування")
             return
-        dlg = ComputerDialog(self.repo, self.comp_types_repo.get_all(), self.workplaces_repo.get_all(), computer=obj,
-                             parent=self)
+        # Додаємо self.status_logs_repo перед computer=obj
+        dlg = ComputerDialog(self.repo, self.comp_types_repo.get_all(), self.workplaces_repo.get_all(), self.status_logs_repo, computer=obj, parent=self)
         if dlg.exec(): self.load_data()
 
     def _delete(self):
@@ -180,47 +182,47 @@ class ComputersWidget(QWidget):
             except IntegrityError:
                 QMessageBox.critical(self, "Помилка", "Неможливо видалити: є пов'язані записи.")
 
-        # ─── ЕКСПОРТ ─────────────────────────────────────────────────────────────
+    # ─── ЕКСПОРТ  ───
 
-        def _prepare_export_data(self):
-            """Готує дані з поточної моделі таблиці для експорту."""
-            headers = [col[1] for col in ComputerTableModel.COLUMNS]
-            data = []
-            # Проходимося по всіх відфільтрованих рядках у ProxyModel
-            for row in range(self.proxy_model.rowCount()):
-                row_data = []
-                for col in range(self.proxy_model.columnCount()):
-                    idx = self.proxy_model.index(row, col)
-                    # Беремо текст, який бачить користувач
-                    val = self.proxy_model.data(idx, Qt.ItemDataRole.DisplayRole)
-                    row_data.append(val)
-                data.append(row_data)
-            return headers, data
+    def _prepare_export_data(self):
+        """Готує дані з поточної моделі таблиці для експорту."""
+        headers = [col[1] for col in ComputerTableModel.COLUMNS]
+        data = []
+        # Проходимося по всіх відфільтрованих рядках у ProxyModel
+        for row in range(self.proxy_model.rowCount()):
+            row_data = []
+            for col in range(self.proxy_model.columnCount()):
+                idx = self.proxy_model.index(row, col)
+                # Беремо текст, який бачить користувач
+                val = self.proxy_model.data(idx, Qt.ItemDataRole.DisplayRole)
+                row_data.append(val)
+            data.append(row_data)
+        return headers, data
 
-        def _export_excel(self):
-            headers, data = self._prepare_export_data()
-            if not data:
-                QMessageBox.warning(self, "Помилка", "Немає даних для експорту!")
-                return
+    def _export_excel(self):
+        headers, data = self._prepare_export_data()
+        if not data:
+            QMessageBox.warning(self, "Помилка", "Немає даних для експорту!")
+            return
 
-            filepath, _ = QFileDialog.getSaveFileName(self, "Зберегти Excel", "", "Excel Files (*.xlsx)")
-            if filepath:
-                try:
-                    Exporter.to_excel(filepath, headers, data, "Реєстр комп'ютерів")
-                    QMessageBox.information(self, "Успіх", "Файл успішно збережено!")
-                except Exception as e:
-                    QMessageBox.critical(self, "Помилка експорту", str(e))
+        filepath, _ = QFileDialog.getSaveFileName(self, "Зберегти Excel", "", "Excel Files (*.xlsx)")
+        if filepath:
+            try:
+                Exporter.to_excel(filepath, headers, data, "Реєстр комп'ютерів")
+                QMessageBox.information(self, "Успіх", "Файл успішно збережено!")
+            except Exception as e:
+                QMessageBox.critical(self, "Помилка експорту", str(e))
 
-        def _export_pdf(self):
-            headers, data = self._prepare_export_data()
-            if not data:
-                QMessageBox.warning(self, "Помилка", "Немає даних для експорту!")
-                return
+    def _export_pdf(self):
+        headers, data = self._prepare_export_data()
+        if not data:
+            QMessageBox.warning(self, "Помилка", "Немає даних для експорту!")
+            return
 
-            filepath, _ = QFileDialog.getSaveFileName(self, "Зберегти PDF", "", "PDF Files (*.pdf)")
-            if filepath:
-                try:
-                    Exporter.to_pdf(filepath, headers, data, "Реєстр комп'ютерів")
-                    QMessageBox.information(self, "Успіх", "Файл успішно збережено!")
-                except Exception as e:
-                    QMessageBox.critical(self, "Помилка експорту", str(e))
+        filepath, _ = QFileDialog.getSaveFileName(self, "Зберегти PDF", "", "PDF Files (*.pdf)")
+        if filepath:
+            try:
+                Exporter.to_pdf(filepath, headers, data, "Реєстр комп'ютерів")
+                QMessageBox.information(self, "Успіх", "Файл успішно збережено!")
+            except Exception as e:
+                QMessageBox.critical(self, "Помилка експорту", str(e))
