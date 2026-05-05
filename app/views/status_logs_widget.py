@@ -6,6 +6,37 @@ from PyQt6.QtCore import QDate
 from app.views.models.generic_table_model import GenericTableModel
 
 
+# 🌟 ДОДАНО: Клас-перекладач для головного журналу аудиту
+class LogWrapper:
+    def __init__(self, log):
+        # 1. Форматуємо дату
+        self.date_str = log.changed_at.strftime("%d.%m.%Y %H:%M") if log.changed_at else ""
+
+        # 2. Перекладаємо тип пристрою
+        device_map = {
+            "computer": "Комп'ютер",
+            "peripheral": "Периферія"
+        }
+        self.device_name = device_map.get(log.device_type, log.device_type)
+
+        # 3. Перекладаємо статуси
+        status_map = {
+            "active": "Активний",
+            "repair": "Ремонт",
+            "decommissioned": "Списаний",
+            "storage": "На зберіганні",
+            "—": "—"
+        }
+        self.old_st_str = status_map.get(log.old_status, log.old_status)
+        self.new_st_str = status_map.get(log.new_status, log.new_status)
+
+        # 4. Витягуємо ім'я користувача
+        self.user_name = log.user.full_name if getattr(log, 'user', None) else "Система"
+
+        # 5. Коментар
+        self.comment = log.comment or ""
+
+
 class StatusLogsWidget(QWidget):
     def __init__(self, logs_repo, users_repo, parent=None):
         super().__init__(parent)
@@ -72,6 +103,7 @@ class StatusLogsWidget(QWidget):
     def load_data(self):
         dev_map = {0: None, 1: "computer", 2: "peripheral"}
 
+        # Отримуємо сирі дані з бази
         logs = self.repo.get_recent(
             limit=200,
             device_type=dev_map[self.f_device.currentIndex()],
@@ -79,7 +111,12 @@ class StatusLogsWidget(QWidget):
             date_from=self.f_date_from.date().toPyDate(),
             date_to=self.f_date_to.date().toPyDate()
         )
-        self.model.refresh(logs)
+
+        # 🌟 ЗМІНЕНО: Огортаємо сирі дані у наш клас LogWrapper
+        wrapped_logs = [LogWrapper(log) for log in logs]
+
+        # Передаємо підготовлені дані в таблицю
+        self.model.refresh(wrapped_logs)
 
     def _reset_filters(self):
         self.f_device.setCurrentIndex(0)

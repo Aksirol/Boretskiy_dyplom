@@ -9,8 +9,29 @@ from app.services.auth import session_manager
 from app.views.models.generic_table_model import GenericTableModel
 
 
+# 🌟 ДОДАНО: Клас-обгортка для підготовки даних перед відображенням у таблиці
+class LogWrapper:
+    def __init__(self, log):
+        # Форматуємо дату в зручний формат
+        self.date_str = log.changed_at.strftime("%d.%m.%Y %H:%M") if log.changed_at else ""
+
+        # Словник для перекладу системних статусів на зрозумілі слова
+        status_map = {
+            "active": "Активний",
+            "repair": "Ремонт",
+            "decommissioned": "Списаний",
+            "storage": "На зберіганні",
+            "—": "—"
+        }
+
+        self.old_st_str = status_map.get(log.old_status, log.old_status)
+        self.new_st_str = status_map.get(log.new_status, log.new_status)
+
+        # Витягуємо ім'я користувача або ставимо заглушку
+        self.user_name = log.user.full_name if getattr(log, 'user', None) else "Система"
+
+
 class ComputerDialog(QDialog):
-    # ДОДАНО: status_logs_repo у параметри ініціалізації
     def __init__(self, repo, computer_types, workplaces, status_logs_repo=None, computer=None, parent=None):
         super().__init__(parent)
         self.repo = repo
@@ -22,10 +43,10 @@ class ComputerDialog(QDialog):
         self.setWindowTitle("Редагування комп'ютера" if computer else "Новий комп'ютер")
         self.setMinimumWidth(500)
         self.setMinimumHeight(450)
-        self._build_ui()  # Перейменували _build_form на _build_ui
+        self._build_ui()
         if computer:
             self._populate(computer)
-            self._load_logs()  # Завантажуємо історію
+            self._load_logs()
 
     def _build_ui(self):
         main_layout = QVBoxLayout(self)
@@ -45,45 +66,45 @@ class ComputerDialog(QDialog):
             room_info = f" ({wp.room.name})" if wp.room else ""
             self.f_workplace.addItem(f"{wp.name}{room_info}", wp.id)
 
-        self.f_brand = QLineEdit();
-        self.f_model = QLineEdit();
+        self.f_brand = QLineEdit()
+        self.f_model = QLineEdit()
         self.f_processor = QLineEdit()
-        self.f_ram = QSpinBox();
-        self.f_ram.setRange(1, 512);
+        self.f_ram = QSpinBox()
+        self.f_ram.setRange(1, 512)
         self.f_ram.setSuffix(" ГБ")
-        self.f_storage = QSpinBox();
-        self.f_storage.setRange(1, 10000);
+        self.f_storage = QSpinBox()
+        self.f_storage.setRange(1, 10000)
         self.f_storage.setSuffix(" ГБ")
-        self.f_storage_type = QComboBox();
+        self.f_storage_type = QComboBox()
         self.f_storage_type.addItems(["SSD", "HDD", "NVMe", "Інше"])
         self.f_os = QLineEdit()
-        self.f_ip = QLineEdit();
+        self.f_ip = QLineEdit()
         self.f_ip.setPlaceholderText("192.168.1.1")
-        self.f_mac = QLineEdit();
+        self.f_mac = QLineEdit()
         self.f_mac.setPlaceholderText("AA:BB:CC:DD:EE:FF")
-        self.f_date = QDateEdit(calendarPopup=True);
+        self.f_date = QDateEdit(calendarPopup=True)
         self.f_date.setDate(QDate.currentDate())
 
         self.f_status = QComboBox()
         for val, label in [("active", "Активний"), ("repair", "Ремонт"),
                            ("decommissioned", "Списаний"), ("storage", "На зберіганні")]:
             self.f_status.addItem(label, val)
-        self.f_notes = QTextEdit();
+        self.f_notes = QTextEdit()
         self.f_notes.setFixedHeight(60)
 
-        layout.addRow("Інв. номер *", self.f_inventory);
+        layout.addRow("Інв. номер *", self.f_inventory)
         layout.addRow("Тип ПК *", self.f_type)
-        layout.addRow("Робоче місце", self.f_workplace);
+        layout.addRow("Робоче місце", self.f_workplace)
         layout.addRow("Виробник", self.f_brand)
-        layout.addRow("Модель", self.f_model);
+        layout.addRow("Модель", self.f_model)
         layout.addRow("Процесор", self.f_processor)
-        layout.addRow("RAM", self.f_ram);
+        layout.addRow("RAM", self.f_ram)
         layout.addRow("Об'єм диску", self.f_storage)
-        layout.addRow("Тип диску", self.f_storage_type);
+        layout.addRow("Тип диску", self.f_storage_type)
         layout.addRow("ОС", self.f_os)
-        layout.addRow("IP-адреса", self.f_ip);
+        layout.addRow("IP-адреса", self.f_ip)
         layout.addRow("MAC-адреса", self.f_mac)
-        layout.addRow("Дата закупівлі", self.f_date);
+        layout.addRow("Дата закупівлі", self.f_date)
         layout.addRow("Статус", self.f_status)
         layout.addRow("Примітки", self.f_notes)
 
@@ -100,7 +121,6 @@ class ComputerDialog(QDialog):
         logs_layout.addWidget(self.logs_table)
         self.tabs.addTab(self.tab_logs, "Історія змін")
 
-        # Вимикаємо вкладку історії, якщо комп'ютер ще не створено
         if not self.computer: self.tabs.setTabEnabled(1, False)
 
         main_layout.addWidget(self.tabs)
@@ -111,9 +131,11 @@ class ComputerDialog(QDialog):
         main_layout.addWidget(btns)
 
     def _load_logs(self):
+        # 🌟 ЗМІНЕНО: Використовуємо обгортку LogWrapper перед передачею даних у таблицю
         if self.status_logs_repo and self.computer:
             logs = self.status_logs_repo.get_by_device("computer", self.computer.id)
-            self.logs_model.refresh(logs)
+            wrapped_logs = [LogWrapper(log) for log in logs]
+            self.logs_model.refresh(wrapped_logs)
 
     def _populate(self, c):
         self.f_inventory.setText(c.inventory_number or "")
@@ -142,7 +164,6 @@ class ComputerDialog(QDialog):
         self.f_notes.setPlainText(c.notes or "")
 
     def _validate(self) -> bool:
-        """Перевіряє, чи заповнені обов'язкові поля."""
         if not self.f_inventory.text().strip():
             QMessageBox.warning(self, "Валідація", "Інвентарний номер є обов'язковим")
             self.f_inventory.setFocus()
@@ -150,7 +171,6 @@ class ComputerDialog(QDialog):
         return True
 
     def _collect(self) -> dict:
-        """Збирає дані з полів форми у словник."""
         return {
             "inventory_number": self.f_inventory.text().strip(),
             "computer_type_id": self.f_type.currentData(),
@@ -184,7 +204,6 @@ class ComputerDialog(QDialog):
                 new_comp = self.repo.create(**data)
                 comp_id = new_comp.id
 
-            # ІНТЕГРАЦІЯ АУДИТУ: Пишемо лог, якщо статус змінився
             if old_status != new_status and self.status_logs_repo:
                 user = session_manager.get_user()
                 self.status_logs_repo.create(
