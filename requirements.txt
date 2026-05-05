@@ -1,6 +1,6 @@
 SQLAlchemy==2.0.29
 alembic==1.13.1
 PyQt6==6.6.1
-passlib[bcrypt]==1.7.4
+bcrypt==1.7.4
 openpyxl==3.1.2
 pytest==9.0.3

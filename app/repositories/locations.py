@@ -27,6 +27,16 @@ class WorkplacesRepository(BaseRepository[Workplace]):
     def __init__(self, session_factory):
         super().__init__(session_factory, Workplace)
 
+    # Додаємо перевизначений метод get_all
+    def get_all(self) -> list[Workplace]:
+        """
+        Отримує всі робочі місця, одразу завантажуючи пов'язані кімнати.
+        Це запобігає помилці DetachedInstanceError при зверненні до wp.room.name
+        """
+        with self.session_factory() as session:
+            # Використовуємо options(joinedload(...)), щоб підтягнути дані кімнати одним запитом
+            return session.query(Workplace).options(joinedload(Workplace.room)).all()
+
     def search_and_filter(self, room_id: int | None = None, query: str = "") -> list[Workplace]:
         with self.session_factory() as session:
             # 1. Створюємо підзапити для підрахунку комп'ютерів та периферії

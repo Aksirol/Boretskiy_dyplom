@@ -1,8 +1,8 @@
-"""Initial migration
+"""Initial complete migration
 
-Revision ID: c1cda170dd24
+Revision ID: 4172697ecfda
 Revises: 
-Create Date: 2026-05-04 15:20:27.349460
+Create Date: 2026-05-04 21:10:00.219779
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'c1cda170dd24'
+revision: str = '4172697ecfda'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -29,8 +29,8 @@ def upgrade() -> None:
     op.create_table('employees',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('full_name', sa.String(length=100), nullable=False),
-    sa.Column('position', sa.String(length=100), nullable=False),
-    sa.Column('department', sa.String(length=100), nullable=False),
+    sa.Column('position', sa.String(length=100), nullable=True),
+    sa.Column('department', sa.String(length=100), nullable=True),
     sa.Column('phone', sa.String(length=20), nullable=True),
     sa.Column('email', sa.String(length=100), nullable=True),
     sa.PrimaryKeyConstraint('id')
@@ -97,7 +97,7 @@ def upgrade() -> None:
     sa.Column('ip_address', sa.String(length=15), nullable=True),
     sa.Column('mac_address', sa.String(length=17), nullable=True),
     sa.Column('purchase_date', sa.Date(), nullable=True),
-    sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('status', sa.String(length=50), nullable=False),
     sa.Column('notes', sa.Text(), nullable=True),
     sa.ForeignKeyConstraint(['computer_type_id'], ['computer_types.id'], ),
     sa.ForeignKeyConstraint(['workplace_id'], ['workplaces.id'], ),
@@ -113,7 +113,7 @@ def upgrade() -> None:
     sa.Column('model', sa.String(length=50), nullable=False),
     sa.Column('serial_number', sa.String(length=100), nullable=True),
     sa.Column('purchase_date', sa.Date(), nullable=True),
-    sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('status', sa.String(length=50), nullable=False),
     sa.Column('notes', sa.Text(), nullable=True),
     sa.ForeignKeyConstraint(['peripheral_type_id'], ['peripheral_types.id'], ),
     sa.ForeignKeyConstraint(['workplace_id'], ['workplaces.id'], ),

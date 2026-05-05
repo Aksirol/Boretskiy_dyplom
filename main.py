@@ -1,4 +1,5 @@
 import sys
+import traceback
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from app.database.database import SessionLocal, engine, Base
@@ -47,10 +48,27 @@ def main():
         # Користувач закрив вікно входу
         sys.exit(0)
 
+
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        # Глобальний перехват помилок для запобігання тихому "вильоту"
-        print(f"Критична помилка: {e}")
-        # Тут можна вивести QMessageBox для користувача
+        # 1. Формуємо детальний текст помилки (допоможе при відладці зібраного .exe)
+        error_details = traceback.format_exc()
+        error_msg = f"Сталася критична помилка:\n{str(e)}\n\nДеталі:\n{error_details}"
+
+        # Залишаємо вивід у консоль для зручності розробки
+        print(error_msg)
+
+        # 2. Безпечно отримуємо або створюємо QApplication
+        # Якщо програма впала ДО створення app у функції main(), ми маємо створити його тут,
+        # інакше вікно QMessageBox просто не з'явиться.
+        app = QApplication.instance()
+        if not app:
+            app = QApplication(sys.argv)
+
+        # 3. Виводимо графічне повідомлення для користувача
+        QMessageBox.critical(None, "Фатальна помилка програми", error_msg)
+
+        # 4. Завершуємо роботу з кодом помилки
+        sys.exit(1)

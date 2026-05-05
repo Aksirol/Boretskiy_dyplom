@@ -34,8 +34,8 @@ class Employee(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    position: Mapped[str] = mapped_column(String(100))
-    department: Mapped[str] = mapped_column(String(100))
+    position: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    department: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str] = mapped_column(String(100), nullable=True)
 
@@ -80,7 +80,7 @@ class Computer(Base):
     ip_address: Mapped[str] = mapped_column(String(15), nullable=True)
     mac_address: Mapped[str] = mapped_column(String(17), nullable=True)
     purchase_date: Mapped[date] = mapped_column(Date, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="В роботі")
+    status: Mapped[str] = mapped_column(String(50), default="active")
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 
     computer_type = relationship("ComputerType", back_populates="computers")
@@ -105,7 +105,7 @@ class Peripheral(Base):
     model: Mapped[str] = mapped_column(String(50))
     serial_number: Mapped[str] = mapped_column(String(100), nullable=True)
     purchase_date: Mapped[date] = mapped_column(Date, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="В роботі")
+    status: Mapped[str] = mapped_column(String(50), default="active")
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 
     peripheral_type = relationship("PeripheralType", back_populates="peripherals")
